@@ -18,7 +18,7 @@ Depois acesse `http://localhost:8080`. Também funciona direto no GitHub Pages.
 |---|---|
 | W A S D / Shift | Andar / correr |
 | Mouse | Olhar e mirar |
-| Clique esquerdo (segurar) | Carregar força; soltar arremessa |
+| Clique esquerdo (segurar) | Sobe a barra; solte na **faixa verde** = cesta garantida |
 | Espaço | Pular — perto do aro com a bola, clique para **enterrar** |
 | Q / clique direito | Driblar (segure para driblar sem parar) |
 | E | Pegar bola próxima |
@@ -27,6 +27,15 @@ Depois acesse `http://localhost:8080`. Também funciona direto no GitHub Pages.
 ### Celular
 Joystick à esquerda para andar (empurre até o fim para correr), arraste à direita para mirar,
 e botões **ARREMESSAR**, **PULAR**, **DRIBLAR**, **PEGAR** e **↺** (chamar bola).
+
+### Arremesso, bandeja e enterrada
+- **Arremesso:** segure o botão e solte quando a barra estiver na faixa verde → cesta 100%.
+  Fora do verde a bola sai curta (cedo) ou longa (tarde). A faixa fica menor de longe e correndo.
+- **Bandeja:** correndo em direção à cesta (até ~4 m) com a bola, aperte o arremesso — o jogador
+  sobe sozinho; solte no verde (topo do pulo) para converter.
+- **Enterrada:** a mesma infiltração correndo no máximo (Shift / joystick no fim). Também dá
+  para pular perto do aro e apertar o arremesso.
+- **Drible automático:** andar com a bola faz o jogador quicá-la.
 
 ## Recursos
 - Quadra com medidas oficiais (aro a 3,05 m, linha de 3 a 6,75 m) e física real da bola:

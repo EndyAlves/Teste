@@ -26,11 +26,14 @@
   .chip span{font-size:10px;letter-spacing:.12em;opacity:.7;text-transform:uppercase}
   .chip.main b{font-size:32px;color:var(--accent)}
   #cross{position:absolute;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;background:var(--ui);box-shadow:0 0 0 2px rgba(0,0,0,.35)}
-  #meter{position:absolute;left:calc(50% - 50px);top:calc(50% - 70px);width:12px;height:140px;border-radius:8px;background:rgba(0,0,0,.45);overflow:hidden;opacity:0;transition:opacity .12s;border:2px solid rgba(255,255,255,.7)}
+  #meter{position:absolute;left:calc(50% - 58px);top:calc(50% - 85px);width:16px;height:170px;border-radius:8px;background:rgba(0,0,0,.45);overflow:hidden;opacity:0;transition:opacity .12s;border:2px solid rgba(255,255,255,.7)}
   #meter.on{opacity:1}
   #meterFill{position:absolute;left:0;right:0;bottom:0;height:0;background:linear-gradient(#ffd23f,#ff6a1f)}
   #meterFill.good{background:var(--good)}
-  #meterIdeal{position:absolute;left:-2px;right:-2px;height:3px;background:#fff;box-shadow:0 0 6px #fff;display:none}
+  #meterGreen{position:absolute;left:0;right:0;background:rgba(56,212,122,.45);border-top:2px solid #fff;border-bottom:2px solid #fff;box-shadow:0 0 10px var(--good)}
+  #shotFb{position:absolute;left:calc(50% - 50px);top:calc(50% + 94px);transform:translateX(-50%);font-weight:900;font-size:18px;letter-spacing:.06em;text-shadow:0 2px 0 rgba(0,0,0,.4);opacity:0;white-space:nowrap}
+  #shotFb.show{animation:fb .9s ease-out forwards}
+  @keyframes fb{0%{opacity:0;transform:translate(-50%,8px)}15%{opacity:1;transform:translate(-50%,0)}70%{opacity:1}100%{opacity:0;transform:translate(-50%,-10px)}}
   #popup{position:absolute;left:50%;top:30%;transform:translate(-50%,-50%);font-weight:900;font-size:clamp(28px,6vw,56px);text-align:center;text-shadow:0 4px 0 rgba(0,0,0,.35),0 0 20px rgba(0,0,0,.25);opacity:0;white-space:nowrap}
   #popup small{display:block;font-size:.45em;font-weight:700;opacity:.9}
   #popup.show{animation:pop 1.3s ease-out forwards}
@@ -90,7 +93,8 @@
     <div class="chip"><b id="sStreak">0</b><span>Sequência</span></div>
   </div>
   <div id="cross"></div>
-  <div id="meter"><div id="meterFill"></div><div id="meterIdeal"></div></div>
+  <div id="meter"><div id="meterFill"></div><div id="meterGreen"></div></div>
+  <div id="shotFb"></div>
   <div id="popup"></div>
   <div id="hint"></div>
 </div>
@@ -114,7 +118,7 @@
     <div class="keys only-desk">
       <kbd>W A S D</kbd><span>Andar &nbsp;·&nbsp; <kbd>Shift</kbd> correr</span>
       <kbd>Mouse</kbd><span>Olhar / mirar</span>
-      <kbd>Clique esq.</kbd><span>Segure para carregar, solte para arremessar</span>
+      <kbd>Clique esq.</kbd><span>Segure e solte no verde para arremessar · infiltrando: bandeja / enterrada</span>
       <kbd>Espaço</kbd><span>Pular (pule perto do aro para enterrar)</span>
       <kbd>Q / Clique dir.</kbd><span>Driblar (segure para driblar sem parar)</span>
       <kbd>E</kbd><span>Pegar bola próxima</span>
@@ -124,12 +128,12 @@
     <div class="keys only-touch">
       <kbd>Lado esquerdo</kbd><span>Arraste para andar (empurre até o fim para correr)</span>
       <kbd>Lado direito</kbd><span>Arraste para olhar / mirar</span>
-      <kbd>ARREMESSAR</kbd><span>Segure para carregar, solte para arremessar</span>
+      <kbd>ARREMESSAR</kbd><span>Segure e solte no verde · infiltrando vira BANDEJA / ENTERRAR</span>
       <kbd>PULAR</kbd><span>Pule perto do aro com a bola para enterrar</span>
       <kbd>DRIBLAR</kbd><span>Segure para driblar sem parar</span>
       <kbd>PEGAR / ↺</kbd><span>Pegar bola próxima / chamar a bola</span>
     </div>
-    <label class="row"><input type="checkbox" id="optAssist" checked> Mostrar marcador de força ideal no medidor</label>
+    <p class="sub" style="margin-top:-6px">Segure para arremessar e solte com a barra na <b style="color:var(--good)">faixa verde</b>: cesta garantida. Correndo para a cesta, o botão de arremesso faz <b>bandeja</b>; correndo rápido (Shift / joystick no máximo), faz <b>enterrada</b>.</p>
     <button id="play">JOGAR</button>
   </div>
 </div>
@@ -157,7 +161,8 @@ const BOARD_X = 14 - 1.2;      // face da tabela
 const THREE_PT = 6.75;
 const GYM = { x: 17, z: 11, h: 10 };
 const EYE = 1.7;
-const CHARGE_TIME = 1.0;
+const SHOT_TIME = 0.9, GREEN_C = 0.82;          // arremesso: tempo da barra e centro da faixa verde
+const LAY_T = 0.62, LAY_C = 0.66, LAY_W = 0.12; // bandeja: duração, centro e meia-largura da faixa verde
 const MIN_SPEED = 3, MAX_SPEED = 13;
 const ARC_BOOST = 0.75;        // ~43° somado à inclinação da câmera
 
@@ -607,7 +612,7 @@ const player = {
 }
 let held = balls[0]; held.held = true;
 let charging = false, chargeT = 0, followT = 0, dribbleHeld = false, redribbleT = -1;
-let playing = false, assist = true, dunkHoop = null, time = 0;
+let playing = false, dunkHoop = null, time = 0, move = null, dribPhase = 0;
 const stats = { pts: 0, made: 0, shots: 0, streak: 0, best: 0 };
 
 const fwdH = new V3(), rightH = new V3(), holdPoint = new V3(), tmp = new V3(), tmp2 = new V3();
@@ -665,7 +670,7 @@ const sfx = {
 const $ = id => document.getElementById(id);
 const ui = {
   pts: $('sPts'), made: $('sMade'), streak: $('sStreak'), meter: $('meter'), fill: $('meterFill'),
-  ideal: $('meterIdeal'), popup: $('popup'), hint: $('hint'), menu: $('menu'), play: $('play'),
+  green: $('meterGreen'), fb: $('shotFb'), popup: $('popup'), hint: $('hint'), menu: $('menu'), play: $('play'),
   bShoot: $('bShoot'), bGrab: $('bGrab'), bDrib: $('bDrib'),
 };
 function updateHUD() {
@@ -700,15 +705,113 @@ function nearestBall(maxD) {
 function catchBall(b) {
   if (held) return;
   if (b.shot) { stats.streak = 0; updateHUD(); }
-  held = b; b.held = true; b.pull = false; b.dribble = false; b.shot = false; b.dunk = false;
+  held = b; b.held = true; b.pull = false; b.dribble = false; b.shot = false; b.dunk = false; b.sure = false;
   if (dribbleHeld) redribbleT = 0.05;
 }
 function startCharge() {
   if (!playing) return;
   initAudio();
   if (!held) { const b = nearestBall(3.2); if (b) b.pull = true; return; }
+  if (move) return;
   if (dunkHoop) { doDunk(dunkHoop); return; }
+  const drive = driveType();
+  if (drive) { startMove(drive, targetHoop()); return; }
   charging = true; chargeT = 0;
+}
+function facingHoop(h, minDot) {
+  tmp.set(h.center.x - player.pos.x, 0, h.center.z - player.pos.z).normalize();
+  return tmp.dot(fwdH) > minDot;
+}
+// infiltração: correndo em direção à cesta com a bola
+function driveType() {
+  if (!held || !player.onGround || move || charging || player.hang > 0) return null;
+  const h = targetHoop();
+  const dx = h.center.x - player.pos.x, dz = h.center.z - player.pos.z, d = Math.hypot(dx, dz);
+  if (d > 4 || d < 0.45 || Math.abs(player.pos.x) > Math.abs(h.center.x) || !facingHoop(h, 0.45)) return null;
+  const toward = (player.vel.x * dx + player.vel.z * dz) / d;
+  if (toward < 1.5) return null;
+  return player.sprint ? 'dunk' : 'layup';
+}
+function startMove(type, h) {
+  const p = player;
+  tmp.set(h.center.x - p.pos.x, 0, h.center.z - p.pos.z).normalize();
+  const off = type === 'dunk' ? 0.5 : 0.85, T = 0.41;
+  const vx = (h.center.x - tmp.x * off - p.pos.x) / T, vz = (h.center.z - tmp.z * off - p.pos.z) / T;
+  const hv = Math.hypot(vx, vz), k = hv > 9 ? 9 / hv : 1;
+  p.vel.set(vx * k, 6.1, vz * k);
+  p.onGround = false;
+  move = { type, h, t: 0, released: false };
+}
+function updateMove(dt) {
+  const p = player, h = move.h;
+  move.t += dt;
+  const ty = Math.atan2(-(h.center.x - p.pos.x), -(h.center.z - p.pos.z));
+  const dy = ((ty - p.yaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+  p.yaw += dy * (1 - Math.exp(-8 * dt));
+  p.pitch += (0.35 - p.pitch) * (1 - Math.exp(-5 * dt));
+  if (move.type === 'dunk' && held && move.t >= 0.38) { doDunk(h); return; }
+  if (move.type === 'layup' && held && !move.released && move.t >= LAY_T) releaseLayup();
+  if (!held && move.type === 'layup' && !move.released) move = null;
+}
+function releaseLayup() {
+  move.released = true;
+  launch(held, move.h, move.t / LAY_T, LAY_C, LAY_W, 'layup');
+}
+function greenWidth() { // meia-largura da faixa verde do arremesso
+  const h = targetHoop();
+  const d = Math.hypot(h.center.x - player.pos.x, h.center.z - player.pos.z);
+  let w = clamp(0.085 - d * 0.005, 0.035, 0.08);
+  if (Math.hypot(player.vel.x, player.vel.z) > 3) w *= 0.7;
+  return w;
+}
+// velocidade para a bola sair de `from` e passar pelo centro do aro com ângulo `ang`
+function solveShot(from, target, ang, out) {
+  const dx = Math.hypot(target.x - from.x, target.z - from.z), dy = target.y - from.y;
+  if (dx < 0.05) return out.set(0, Math.sqrt(2 * G * Math.max(0.3, dy + 0.3)), 0);
+  const hx = (target.x - from.x) / dx, hz = (target.z - from.z) / dx;
+  for (let a = ang; a < 1.5; a += 0.04) {
+    const c = Math.cos(a), den = 2 * c * c * (dx * Math.tan(a) - dy);
+    if (den <= 0) continue;
+    const v = Math.sqrt(G * dx * dx / den), vh = c * v, vyEnd = Math.sin(a) * v - G * dx / vh;
+    if (vyEnd < -0.75 * vh) return out.set(hx * vh, Math.sin(a) * v, hz * vh); // descendo com ângulo >= ~37°
+  }
+  return out.set(hx * 2, 6, hz * 2);
+}
+function feedback(text, color) {
+  ui.fb.textContent = text; ui.fb.style.color = color;
+  ui.fb.classList.remove('show'); void ui.fb.offsetWidth; ui.fb.classList.add('show');
+}
+// solta a bola: arremesso mirado (barra) ou lançamento livre para onde olha
+function launch(b, h, fill, center, w, kind) {
+  const off = fill - center, green = Math.abs(off) <= w;
+  const aimed = kind === 'layup' || (fill > 0.3 && facingHoop(h, 0.8));
+  if (aimed) {
+    const dist = Math.hypot(h.center.x - b.pos.x, h.center.z - b.pos.z);
+    const ang = kind === 'layup' ? 1.1 : clamp(0.98 - dist * 0.012, 0.82, 0.98);
+    solveShot(b.pos, h.center, ang, b.vel);
+    if (green) {
+      b.sure = true; b.sureT = time;
+      feedback('PERFEITO!', '#38d47a');
+    } else {
+      const e = 0.25 + clamp((Math.abs(off) - w) / 0.15, 0, 1.2);
+      b.vel.multiplyScalar(1 + Math.sign(off) * e * (kind === 'layup' ? 0.1 : 0.07));
+      const yaw = (Math.random() * 2 - 1) * e * 0.05, c = Math.cos(yaw), sn = Math.sin(yaw);
+      b.vel.set(b.vel.x * c - b.vel.z * sn, b.vel.y, b.vel.x * sn + b.vel.z * c);
+      feedback(off < 0 ? 'CEDO' : 'TARDE', off < 0 ? '#ffd23f' : '#ff7a4a');
+    }
+  } else {
+    const speed = MIN_SPEED + clamp(fill, 0, 1) * (MAX_SPEED - MIN_SPEED);
+    const ang = clamp(player.pitch + ARC_BOOST, -0.4, 1.45);
+    const dir = aimDir(b, tmp2);
+    b.vel.set(dir.x * Math.cos(ang) * speed, Math.sin(ang) * speed, dir.z * Math.cos(ang) * speed).add(player.vel);
+  }
+  tmp2.set(b.vel.x, 0, b.vel.z).normalize();
+  b.omega.set(-tmp2.z, 0, tmp2.x).multiplyScalar(14); // backspin
+  b.held = false; held = null; charging = false;
+  Object.assign(b, { shot: aimed, kind, dunk: false, touchedRim: false, touchedBoard: false, catchCD: 0.45, dribble: false, isDribbling: false });
+  b.releasePos.copy(player.pos);
+  if (aimed) { stats.shots++; updateHUD(); }
+  followT = 0.4;
 }
 // cesta para onde o jogador está olhando
 function targetHoop() {
@@ -729,25 +832,16 @@ function aimDir(b, out) {
   return out.normalize();
 }
 function releaseCharge() {
+  if (move && move.type === 'layup' && !move.released && held) { releaseLayup(); return; }
   if (!charging) return;
   charging = false;
   if (!held) return;
-  const b = held, p = clamp(chargeT / CHARGE_TIME, 0, 1);
-  const speed = MIN_SPEED + p * (MAX_SPEED - MIN_SPEED);
-  const ang = clamp(player.pitch + ARC_BOOST, -0.4, 1.45);
-  const dir = aimDir(b, tmp2);
-  b.vel.set(dir.x * Math.cos(ang) * speed, Math.sin(ang) * speed, dir.z * Math.cos(ang) * speed).add(player.vel);
-  b.omega.set(-dir.z, 0, dir.x).multiplyScalar(14); // backspin
-  b.held = false; held = null;
-  Object.assign(b, { shot: true, dunk: false, touchedRim: false, touchedBoard: false, catchCD: 0.45, dribble: false });
-  b.releasePos.copy(player.pos);
-  stats.shots++; updateHUD();
-  followT = 0.4;
+  launch(held, targetHoop(), chargeT / SHOT_TIME, GREEN_C, greenWidth(), 'jump');
 }
 function dribble() {
-  if (!held || charging || !playing) return;
+  if (!held || charging || move || !playing) return;
   const b = held;
-  b.held = false; held = null;
+  b.held = false; held = null; b.isDribbling = false;
   b.dribble = true; b.shot = false; b.catchCD = 0.16;
   b.vel.set(player.vel.x, -6.5, player.vel.z);
   b.omega.set(0, 0, 0);
@@ -766,7 +860,7 @@ function callBall() {
   if (b) { b.pull = true; b.dribble = false; }
 }
 function jump() {
-  if (!playing) return;
+  if (!playing || move) return;
   initAudio();
   if (player.onGround && player.hang <= 0) { player.vel.y = 6.1; player.onGround = false; }
 }
@@ -776,7 +870,8 @@ function doDunk(h) {
   b.held = false; held = null;
   b.pos.set(h.center.x, RIM_Y + 0.2, h.center.z);
   b.vel.set(0, -5, 0);
-  Object.assign(b, { shot: true, dunk: true, touchedRim: true, touchedBoard: false, catchCD: 0.7, dribble: false });
+  Object.assign(b, { shot: true, dunk: true, kind: 'dunk', touchedRim: true, touchedBoard: false, catchCD: 0.7, dribble: false, isDribbling: false, sure: true, sureT: time });
+  move = null;
   b.releasePos.copy(h.center);
   stats.shots++;
   // pendura no aro
@@ -888,10 +983,8 @@ bindBtn('bCall', callBall);
 bindBtn('bPause', () => pause());
 
 /* Menu */
-const optAssist = $('optAssist');
 function start() {
   initAudio();
-  assist = optAssist.checked;
   playing = true;
   ui.menu.classList.add('hidden');
   document.body.classList.add('playing');
@@ -905,7 +998,7 @@ function start() {
   }
 }
 function pause() {
-  playing = false; charging = false; dribbleHeld = false;
+  playing = false; charging = false; dribbleHeld = false; move = null;
   ui.meter.classList.remove('on');
   document.body.classList.remove('playing');
   ui.play.textContent = 'CONTINUAR';
@@ -926,6 +1019,7 @@ function updatePlayer(dt) {
   if (joy.id !== null) { mx += joy.x; mz -= joy.y; }
   const l = Math.hypot(mx, mz); if (l > 1) { mx /= l; mz /= l; }
   const sprint = keys.ShiftLeft || keys.ShiftRight || (joy.id !== null && Math.hypot(joy.x, joy.y) > 0.92);
+  player.sprint = sprint;
   let speed = sprint ? 7.2 : 4.5;
   if (charging) speed *= 0.55;
 
@@ -937,15 +1031,19 @@ function updatePlayer(dt) {
     p.hang -= dt; p.vel.set(0, 0, 0);
     if (p.hang <= 0) { p.vel.y = -0.5; p.vel.addScaledVector(tmp.set(p.pos.x, 0, p.pos.z).sub(tmp2.set(Math.sign(p.pos.x) * HOOP_X, 0, 0)).normalize(), 1.5); }
   } else {
+    if (move) updateMove(dt);
     const tx = (fwdH.x * mz + rightH.x * mx) * speed, tz = (fwdH.z * mz + rightH.z * mx) * speed;
     const k = 1 - Math.exp(-(p.onGround ? 14 : 2.2) * dt);
-    p.vel.x += (tx - p.vel.x) * k;
-    p.vel.z += (tz - p.vel.z) * k;
+    if (!move) {
+      p.vel.x += (tx - p.vel.x) * k;
+      p.vel.z += (tz - p.vel.z) * k;
+    }
     if (!p.onGround) p.vel.y -= 15 * dt;
     p.pos.addScaledVector(p.vel, dt);
     if (p.pos.y <= 0) {
       if (!p.onGround && p.vel.y < -3) { p.land = Math.min(0.12, -p.vel.y * 0.015); sfx.step(); }
       p.pos.y = 0; p.vel.y = 0; p.onGround = true;
+      if (move && move.t > 0.1) move = null;
     } else p.onGround = false;
   }
   // limites e obstáculos
@@ -974,7 +1072,7 @@ function updatePlayer(dt) {
 
   // detectar possibilidade de enterrada
   dunkHoop = null;
-  if (held && !p.onGround && p.hang <= 0) {
+  if (held && !p.onGround && p.hang <= 0 && !(move && move.type === 'layup')) {
     for (const h of hoops) {
       tmp.set(h.center.x - p.pos.x, 0, h.center.z - p.pos.z);
       const d = tmp.length();
@@ -988,13 +1086,34 @@ const ballLocal = new V3();
 function updateHeld(dt) {
   if (held) {
     const b = held;
-    if (dunkHoop) {
-      tmp.copy(camera.position).addScaledVector(fwdH, 0.5); tmp.y += 0.48;
+    const hs = Math.hypot(player.vel.x, player.vel.z);
+    const dribbling = player.onGround && !charging && !move && player.hang <= 0 && hs > 0.9;
+    let rate = 28;
+    if (dribbling) {
+      // drible automático ao se mover com a bola: mão -> chão -> mão
+      const prevU = dribPhase % 1;
+      dribPhase += dt * (1.8 + hs * 0.17);
+      const u = dribPhase % 1;
+      if (prevU < 0.5 && u >= 0.5) { sfx.bounce(5); }
+      const handY = player.pos.y + 1.0;
+      tmp.copy(player.pos).addScaledVector(fwdH, 0.62).addScaledVector(rightH, 0.26).addScaledVector(player.vel, 0.05);
+      tmp.y = BALL_R + (handY - BALL_R) * Math.abs(Math.cos(Math.PI * u));
+      if (!b.isDribbling) { dribPhase = 0.02; }
+      b.isDribbling = true; rate = 60;
+      b.omega.set(0, 0, 0);
     } else {
-      const c = charging ? Math.min(1, chargeT * 6) : 0;
-      tmp.copy(HOLD).lerp(CHARGE, c).applyMatrix4(camera.matrixWorld);
+      if (b.isDribbling && b.pos.y < player.pos.y + 0.9) rate = 14;
+      b.isDribbling = false;
+      if (dunkHoop) {
+        tmp.copy(camera.position).addScaledVector(fwdH, 0.5); tmp.y += 0.48;
+      } else if (move && move.type === 'layup') {
+        tmp.set(0.14, 0.18, -0.45).applyMatrix4(camera.matrixWorld); // bola erguida para a bandeja
+      } else {
+        const c = charging ? Math.min(1, chargeT * 6) : 0;
+        tmp.copy(HOLD).lerp(CHARGE, c).applyMatrix4(camera.matrixWorld);
+      }
     }
-    b.pos.lerp(tmp, 1 - Math.exp(-28 * dt));
+    b.pos.lerp(tmp, 1 - Math.exp(-rate * dt));
     b.vel.copy(player.vel);
     // enterrada automática ao levar a bola sobre o aro
     if (dunkHoop) {
@@ -1006,7 +1125,17 @@ function updateHeld(dt) {
   const L = handL, R = handR;
   if (held) {
     ballLocal.copy(held.pos); camera.worldToLocal(ballLocal);
-    if (charging) {
+    if (held.isDribbling) {
+      // mão direita acompanha a bola por cima; esquerda protege
+      tmp.copy(held.pos); tmp.y = Math.max(held.pos.y, player.pos.y + 0.75) + BALL_R + 0.015;
+      camera.worldToLocal(tmp);
+      R.tp.copy(tmp); R.tr.set(-0.2, 0, 0); R.curl = 0.35;
+      const sw = Math.sin(player.bobPhase) * 0.03;
+      L.tp.set(-0.24, -0.38 + sw, -0.38); L.tr.set(0.2, 0.3, 0.7); L.curl = 0.4;
+    } else if (move && move.type === 'layup') {
+      R.tp.copy(ballLocal).add(tmp.set(0.02, -0.125, 0.04)); R.tr.set(0.4, 0, Math.PI); R.curl = 0.25;
+      L.tp.set(-0.2, -0.2, -0.4); L.tr.set(0, 0.2, 0.6); L.curl = 0.3;
+    } else if (charging) {
       R.tp.copy(ballLocal).add(tmp.set(0.03, -0.125, 0.06)); R.tr.set(0.5, 0, Math.PI);
       L.tp.copy(ballLocal).add(tmp.set(-0.125, -0.03, 0.05)); L.tr.set(0, 0.25, Math.PI / 2);
       R.curl = 0.25; L.curl = 0.35;
@@ -1070,7 +1199,7 @@ function sphereBox(b, c) {
   const cx = clamp(p.x, c.min.x, c.max.x), cy = clamp(p.y, c.min.y, c.max.y), cz = clamp(p.z, c.min.z, c.max.z);
   let dx = p.x - cx, dy = p.y - cy, dz = p.z - cz;
   const d2 = dx * dx + dy * dy + dz * dz;
-  if (d2 >= BALL_R * BALL_R) return;
+  if (d2 >= BALL_R * BALL_R || (b.sure && c.type === 'board')) return;
   let d = Math.sqrt(d2);
   if (d < 1e-6) { dx = 0; dy = 1; dz = 0; d = 0; } else { dx /= d; dy /= d; dz /= d; }
   p.x += dx * (BALL_R - d); p.y += dy * (BALL_R - d); p.z += dz * (BALL_R - d);
@@ -1079,6 +1208,7 @@ function sphereBox(b, c) {
   else impactSound(b, 'bounce', v * 0.7);
 }
 function rimCollide(b, h) {
+  if (b.sure) return;
   const c = h.center, dx = b.pos.x - c.x, dz = b.pos.z - c.z;
   if (Math.abs(b.pos.y - c.y) > 0.2 || dx * dx + dz * dz > 0.25) return;
   const hl = Math.hypot(dx, dz);
@@ -1117,7 +1247,7 @@ function scoreCheck(b, h) {
   sfx.swish();
   if (!b.shot) return;
   const rx = b.releasePos.x - h.center.x, rz = b.releasePos.z;
-  const three = !b.dunk && (Math.hypot(rx, rz) > THREE_PT || (Math.abs(rz) > 6.6 && Math.abs(b.releasePos.x) < 14));
+  const three = b.kind === 'jump' && (Math.hypot(rx, rz) > THREE_PT || (Math.abs(rz) > 6.6 && Math.abs(b.releasePos.x) < 14));
   const pts = three ? 3 : 2;
   stats.pts += pts; stats.made++; stats.streak++;
   stats.best = Math.max(stats.best, stats.streak);
@@ -1125,6 +1255,7 @@ function scoreCheck(b, h) {
   let sub = '';
   if (stats.streak >= 3) sub = `<small>${stats.streak} seguidas! 🔥</small>`;
   if (b.dunk) popup(`ENTERRADA! +2${sub}`, '#ff5a3c');
+  else if (b.kind === 'layup') popup(`BANDEJA! +2${sub}`, '#7cc8ff');
   else if (!b.touchedRim && !b.touchedBoard) popup(`SWISH! +${pts}${sub}`, '#7cf2a4');
   else if (b.touchedBoard && !b.touchedRim) popup(`TABELA! +${pts}${sub}`, '#ffd23f');
   else popup(`${three ? 'CESTA DE 3' : 'CESTA'}! +${pts}${sub}`, '#fff');
@@ -1135,6 +1266,7 @@ function stepPhysics(dt) {
   for (const b of balls) {
     if (b.held) continue;
     b.catchCD -= dt;
+    if (b.sure && ((b.vel.y < 0 && b.pos.y < RIM_Y - 0.6) || time - b.sureT > 4)) b.sure = false;
     b.prevY = b.pos.y;
     if (b.pull) {
       tmp.copy(holdPoint).sub(b.pos);
@@ -1245,37 +1377,31 @@ function updateHoops(dt) {
 /* =========================================================
    Medidor de força
    ========================================================= */
-function idealPower() {
-  if (!held) return null;
-  const best = targetHoop();
-  const b = held, ang = clamp(player.pitch + ARC_BOOST, -0.4, 1.45);
-  const dx = Math.hypot(best.center.x - b.pos.x, best.center.z - b.pos.z) + 0.04, dy = RIM_Y - b.pos.y;
-  const c = Math.cos(ang), den = 2 * c * c * (dx * Math.tan(ang) - dy);
-  if (den <= 0) return null;
-  const v = Math.sqrt(G * dx * dx / den);
-  const p = (v - MIN_SPEED) / (MAX_SPEED - MIN_SPEED);
-  return p >= 0 && p <= 1 ? p : null;
-}
 function updateUI() {
-  ui.meter.classList.toggle('on', charging);
-  if (charging) {
-    const p = clamp(chargeT / CHARGE_TIME, 0, 1);
-    ui.fill.style.height = (p * 100) + '%';
-    const ip = assist ? idealPower() : null;
-    ui.ideal.style.display = ip === null ? 'none' : 'block';
-    if (ip !== null) ui.ideal.style.bottom = `calc(${ip * 100}% - 1px)`;
-    ui.fill.classList.toggle('good', ip !== null && Math.abs(p - ip) < 0.025);
+  let fill = null, c = 0, w = 0;
+  if (charging) { fill = chargeT / SHOT_TIME; c = GREEN_C; w = greenWidth(); }
+  else if (move && move.type === 'layup' && !move.released) { fill = move.t / LAY_T; c = LAY_C; w = LAY_W; }
+  ui.meter.classList.toggle('on', fill !== null);
+  if (fill !== null) {
+    ui.fill.style.height = (clamp(fill, 0, 1) * 100) + '%';
+    ui.green.style.bottom = ((c - w) * 100) + '%';
+    ui.green.style.height = (w * 200) + '%';
+    ui.fill.classList.toggle('good', Math.abs(fill - c) <= w);
   }
   // botões / dicas
   const near = !held && nearestBall(3.5);
+  const drive = driveType();
+  const label = dunkHoop ? 'ENTERRAR!' : drive === 'dunk' ? 'ENTERRAR' : drive === 'layup' ? 'BANDEJA' : 'ARREMESSAR';
   if (isTouch) {
-    ui.bShoot.classList.toggle('dunk', !!dunkHoop);
-    ui.bShoot.textContent = dunkHoop ? 'ENTERRAR!' : 'ARREMESSAR';
+    ui.bShoot.classList.toggle('dunk', !!dunkHoop || drive === 'dunk');
+    if (ui.bShoot.textContent !== label) ui.bShoot.textContent = label;
     ui.bGrab.classList.toggle('dim', !near);
     ui.bDrib.classList.toggle('dim', !held);
-    setHint(dunkHoop ? 'Toque para ENTERRAR!' : '');
+    setHint(dunkHoop ? 'Toque para ENTERRAR!' : drive === 'layup' ? 'Corra no máximo para ENTERRAR' : '');
   } else {
     if (dunkHoop) setHint('Clique para ENTERRAR!');
+    else if (drive === 'dunk') setHint('[Clique] Enterrada');
+    else if (drive === 'layup') setHint('[Clique] Bandeja  ·  segure Shift para enterrar');
     else if (near) setHint('[E] Pegar bola');
     else if (!held) setHint('[R] Chamar a bola');
     else setHint('');
@@ -1318,7 +1444,7 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // para testes automatizados
-window.__game = { player, balls, hoops, stats, start, startCharge, releaseCharge, tick(n = 1) { for (let i = 0; i < n; i++) update(1 / 60); }, charge() { startCharge(); }, shootPower(p) { chargeT = p * CHARGE_TIME; releaseCharge(); }, idealPower, jump, dribble, get held() { return held; } };
+window.__game = { player, balls, hoops, stats, start, startCharge, releaseCharge, tick(n = 1) { for (let i = 0; i < n; i++) update(1 / 60); }, charge() { startCharge(); }, shootPower(p) { chargeT = p * SHOT_TIME; releaseCharge(); }, get move() { return move; }, driveType, setSprint(v) { keys.ShiftLeft = v; }, jump, dribble, get held() { return held; } };
 </script>
 </body>
 </html>
